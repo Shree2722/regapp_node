@@ -1,0 +1,35 @@
+name: CD to Docker Desktop Kubernetes
+
+on:
+  push:
+    branches: ["main"]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Login to Docker Hub
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login -u "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+
+      - name: Build Docker Image
+        run: docker build -t ${{ secrets.DOCKER_USERNAME }}/regapp-node:latest .
+
+      - name: Push Docker Image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/regapp-node:latest
+
+      - name: Set up kubectl
+        uses: azure/setup-kubectl@v3
+
+      - name: Configure kubeconfig
+        run: |
+          mkdir -p ~/.kube
+          echo "${{ secrets.KUBE_CONFIG }}" > ~/.kube/config
+
+      - name: Deploy to Kubernetes
+        run: |
+          kubectl set image deployment/regapp-node-deployment regapp-node=${{ secrets.DOCKER_USERNAME }}/regapp-node:latest
+          kubectl rollout status deployment/regapp-node-deployment
